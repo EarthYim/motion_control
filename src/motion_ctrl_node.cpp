@@ -11,7 +11,7 @@ class Control {
 		
 		//class attributes
 		geometry_msgs::Pose2D current_pose;
-		geometry_msgs::twist current_vel;
+		geometry_msgs::Twist current_vel;
 		geometry_msgs::Pose2D path;
 		geometry_msgs::Pose2D wp;
 		double displacement;
@@ -20,13 +20,13 @@ class Control {
 		// class variables
 		double p_error_x = 0.0;
 		double p_error_z = 0.0;
-		static int iteration = 100; //steps
-		const static double radius = 1.0;
-		static double threshold = 0.1;
-		double Kp_x = 0.5;
-		double Kd_x = 0.0; 
-		double Kp_z = 0.5; 
-		double Kd_z = 0.0;
+		int iteration = 100; //steps
+		double radius = 1.0;
+		double threshold = 0.1;
+		double Kp_x = 0.1;
+		double Kd_x = 0.05; 
+		double Kp_z = 0.8; 
+		double Kd_z = 0.05;
 		
 		// ros::Publisher pub_pose2d;
 
@@ -51,7 +51,7 @@ class Control {
 			
 			// ROS_INFO("angle: %f", current_pose.theta);
 
-			current_vel.linear.x = msg->twist.twsit.linear.x;
+			current_vel.linear.x = msg->twist.twist.linear.x;
 			current_vel.angular.z = msg->twist.twist.angular.z;
 		}
 
@@ -65,11 +65,11 @@ class Control {
 
 		void get_wp(int count, double radius) {
 			double theta = (2*PI/iteration)*count;
-			cardoid(theta, radius); 
+			cardiod(theta, radius); 
 		}
 
-		bool ongoingAction () {
-			if (current_vel.linear.x != 0 || current_vel.angular.z != 0 ) {
+		bool ongoingForward () {
+			if (current_vel.linear.x != 0) {
 				return true;
 			}
 			else {
@@ -115,16 +115,18 @@ class Control {
 			double dx = (error_x - p_error_x) / 0.1; //need confrimed 100 ms
 			double dz =  (error_z - p_error_z) / 0.1;
 			command.linear.x = Kp_x*error_x + Kd_x*dx;
-			command.angular.z = Kp_z*error_z + Kd_z*dz;
+			command.angular.z = -1 * Kp_z*error_z + Kd_z*dz;
 			update_error();
 
 
 		} 
 
 		void get_command() {
-			PDController (displacement, path.theta, Kp_x, Kd_x, Kd_z, Kd_z);
-			ROS_INFO("Commands ready");
-		}
+				PDController (displacement, path.theta, Kp_x, Kd_x, Kd_z, Kd_z);
+				ROS_INFO("Commands ready");
+			}
+
+
 };
 
 
@@ -154,7 +156,7 @@ int main(int argc, char **argv) {
 
 		control.get_wp(count, control.radius);
 		
-		if ! control.arrived() {
+		if (! control.arrived()) {
 			// control.get_path(); already done in .arrived()
 			control.get_command();
 			vel_command_pub.publish(control.command); //publish control.command.
